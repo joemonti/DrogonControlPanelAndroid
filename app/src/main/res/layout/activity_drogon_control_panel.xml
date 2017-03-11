@@ -1,0 +1,95 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:longClickable="true"
+    android:background="#323b61">
+
+    <!--
+    <org.joemonti.drogon.controlpanel.RPiVideoView
+        android:id="@+id/video"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        />
+    -->
+
+    <org.joemonti.drogon.controlpanel.PowerSlider
+        android:id="@+id/powerSlider1"
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"/>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/linearLayout"
+        android:layout_toLeftOf="@+id/powerSlider1">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="Host"
+            android:id="@+id/textView"
+            android:textColor="#8C8E40"
+            android:layout_marginLeft="10dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"/>
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/txtHost"
+            android:layout_margin="5dp"
+            android:width="150dp"
+            android:textColor="#8C8E40"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect"
+            android:id="@+id/btnConnect"
+            android:layout_margin="5dp"
+            android:width="120dp"
+            android:background="@drawable/blue_button"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Arm"
+            android:id="@+id/btnArm"
+            android:background="@drawable/red_button"
+            android:layout_toLeftOf="@+id/powerSlider1"
+            android:layout_margin="5dp"
+            android:width="120dp"
+            />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:text="@string/temp_text"
+        android:id="@+id/tvDebug"
+        android:layout_below="@+id/linearLayout"
+        android:layout_alignParentStart="true"
+        android:layout_toLeftOf="@+id/powerSlider1"
+        android:textColor="#FFFFFF"
+        android:typeface="monospace"
+        android:layout_margin="12dp"
+        android:singleLine="false"
+        android:inputType="textNoSuggestions|textMultiLine"
+        android:gravity="bottom"/>
+
+    <!--
+        android:layout_toRightOf="@id/video"
+        android:layout_toEndOf="@id/video"
+    -->
+
+</RelativeLayout>
