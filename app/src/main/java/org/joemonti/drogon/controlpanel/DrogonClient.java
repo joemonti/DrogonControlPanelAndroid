@@ -3,16 +3,10 @@ package org.joemonti.drogon.controlpanel;
 import org.joemonti.util.ByteUtil;
 import org.zeromq.ZMQ;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.RunnableFuture;
 
 /**
  * Created by joe on 6/13/16.
@@ -38,13 +32,12 @@ public class DrogonClient implements Runnable {
 
     private volatile boolean running;
     private volatile boolean connected;
-    private volatile String host;
 
     private final ControlPanelActivity activity;
 
     private ZMQ.Context context;
     private ZMQ.Socket reqSocket;
-    private ZMQ.Socket pubSocket;
+    //private ZMQ.Socket subSocket;
 
     private final ConcurrentMap<String, Short> eventTypes = new ConcurrentHashMap<String, Short>();
     private final BlockingQueue<Runnable> actionQueue = new ArrayBlockingQueue<Runnable>(1);
@@ -59,12 +52,12 @@ public class DrogonClient implements Runnable {
     }
 
     public void connect(String host) {
-        if (running) {
+        if (!running) {
+
             disconnect();
             connected = false;
         }
-
-        this.host = host;
+        actionQueue.add(new ConnectRunner(host));
     }
 
     public void disconnect() {
@@ -109,28 +102,47 @@ public class DrogonClient implements Runnable {
 
     @Override
     public void run() {
-        activity.writeDebugMessage("Connecting to " + host);
-
-        reqSocket = context.socket(ZMQ.REQ);
-        String reqAddr = "tcp://" + host + ":12210";
-        reqSocket.connect(reqAddr);
-
-        pubSocket = context.socket(ZMQ.PUB);
-        String pubAddr = "tcp://" + host + ":12211";
-        pubSocket.connect(pubAddr);
-
-        readEventType(EVENT_TYPE_FLIGHT_ARM);
-        readEventType(EVENT_TYPE_FLIGHT_MOTOR);
-
-        activity.writeDebugMessage("Connected to " + host);
-
-        connected = true;
+        while (running) {
+            try {
+                Runnable runnable = actionQueue.take();
+                runnable.run();
+            } catch (InterruptedException ex) {
+                // how rude...
+            }
+        }
     }
 
-    class ConnectionRunner implements Runnable {
+    class ConnectRunner implements Runnable {
+        private final String host;
+
+        ConnectRunner(String host) { this.host = host; }
+
         @Override
         public void run() {
+            activity.writeDebugMessage("Connecting to " + host);
 
+            reqSocket = context.socket(ZMQ.REQ);
+            String reqAddr = "tcp://" + host + ":12210";
+            reqSocket.connect(reqAddr);
+
+            //subSocket = context.socket(ZMQ.SUB);
+            //String subAddr = "tcp://" + host + ":12211";
+            //subSocket.connect(subAddr);
+
+            readEventType(EVENT_TYPE_FLIGHT_ARM);
+            readEventType(EVENT_TYPE_FLIGHT_MOTOR);
+
+            activity.writeDebugMessage("Connected to " + host);
+
+            connected = true;
+        }
+    }
+
+    class DisconnectRunner implements Runnable {
+        @Override
+        public void run() {
+            reqSocket.close();
+            reqSocket = null;
         }
     }
 
