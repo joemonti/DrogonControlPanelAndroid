@@ -33,55 +33,59 @@ public class DrogonClient implements Runnable {
     private volatile boolean running;
     private volatile boolean connected;
 
-    private final ControlPanelActivity activity;
+    private final IDrogonClientLogger logger;
 
     private ZMQ.Context context;
     private ZMQ.Socket reqSocket;
     //private ZMQ.Socket subSocket;
 
     private final ConcurrentMap<String, Short> eventTypes = new ConcurrentHashMap<String, Short>();
-    private final BlockingQueue<Runnable> actionQueue = new ArrayBlockingQueue<Runnable>(1);
+
+    private short eventTypeArm;
+    private short eventTypeMotor;
 
     private volatile Thread thread;
 
-    public DrogonClient(ControlPanelActivity activity) {
-        this.activity = activity;
+    private final BlockingQueue<Runnable> actionQueue = new ArrayBlockingQueue<Runnable>(1);
+
+    public DrogonClient(IDrogonClientLogger logger) {
+        this.logger = logger;
+
         connected = false;
+        running = false;
 
         context = ZMQ.context(1);
     }
 
     public void connect(String host) {
         if (!running) {
-
-            disconnect();
-            connected = false;
+            running = true;
+            thread = new Thread(this);
+            thread.start();
         }
         actionQueue.add(new ConnectRunner(host));
     }
 
     public void disconnect() {
         if (running) {
-            running = false;
             actionQueue.clear();
-            actionQueue.add(new Runnable() {
-                @Override
-                public void run() {
-                    // nothing
-                }
-            });
+            actionQueue.add(new DisconnectRunner());
         }
     }
 
     public void updateArmed(boolean armed) {
-
+        actionQueue.add(new ArmedRunner(armed));
     }
 
-    public void updateMotor(double motor) {
-
+    public void updateMotor(double motor, boolean lazy) {
+        if (lazy) {
+            actionQueue.offer(new MotorRunner(motor));
+        } else {
+            actionQueue.add(new MotorRunner(motor));
+        }
     }
 
-    private void readEventType(String name) {
+    private short readEventType(String name) {
         byte[] msg = new byte[ByteUtil.SIZEOF_SHORT + name.length()];
 
         int off = 0;
@@ -95,9 +99,11 @@ public class DrogonClient implements Runnable {
         off = ByteUtil.SIZEOF_SHORT; // skip event type, read next int
         short eventTypeId = (short) ByteUtil.readInt(resp, off);
 
-        activity.writeDebugMessage("Got event type id " + eventTypeId + " for name " + name);
+        logger.debug("Got event type id " + eventTypeId + " for name " + name);
 
         eventTypes.put(name, eventTypeId);
+
+        return eventTypeId;
     }
 
     @Override
@@ -119,7 +125,12 @@ public class DrogonClient implements Runnable {
 
         @Override
         public void run() {
-            activity.writeDebugMessage("Connecting to " + host);
+            logger.debug("Connecting to " + host);
+
+            if (reqSocket != null) {
+                reqSocket.close();
+                reqSocket = null;
+            }
 
             reqSocket = context.socket(ZMQ.REQ);
             String reqAddr = "tcp://" + host + ":12210";
@@ -129,10 +140,10 @@ public class DrogonClient implements Runnable {
             //String subAddr = "tcp://" + host + ":12211";
             //subSocket.connect(subAddr);
 
-            readEventType(EVENT_TYPE_FLIGHT_ARM);
-            readEventType(EVENT_TYPE_FLIGHT_MOTOR);
+            eventTypeArm = readEventType(EVENT_TYPE_FLIGHT_ARM);
+            eventTypeMotor = readEventType(EVENT_TYPE_FLIGHT_MOTOR);
 
-            activity.writeDebugMessage("Connected to " + host);
+            logger.debug("Connected to " + host);
 
             connected = true;
         }
@@ -141,15 +152,60 @@ public class DrogonClient implements Runnable {
     class DisconnectRunner implements Runnable {
         @Override
         public void run() {
-            reqSocket.close();
-            reqSocket = null;
+            if (reqSocket != null) {
+                reqSocket.close();
+                reqSocket = null;
+            }
+            connected = false;
+            running = false;
+
+            logger.debug("Disconnected");
         }
     }
 
-    class ActionRunner implements Runnable {
+    class ArmedRunner implements Runnable {
+        final boolean armed;
+        ArmedRunner(boolean armed) { this.armed = armed; }
+
         @Override
         public void run() {
+            if (!connected) return;
 
+            byte[] msg = new byte[ByteUtil.SIZEOF_SHORT + ByteUtil.SIZEOF_BYTE];
+
+            int off = 0;
+            off = ByteUtil.writeShort(msg, off, eventTypeArm);
+            off = ByteUtil.writeByte(msg, off, (byte)(armed ? 1 : 0));
+
+            reqSocket.send(msg);
+
+            reqSocket.recv();
+
+            logger.debug("Armed Updated to " + (armed ? 1 : 0));
         }
+    }
+
+    class MotorRunner implements Runnable {
+        final double motor;
+        MotorRunner(double motor) { this.motor = motor; }
+
+        @Override
+        public void run() {
+            if (!connected) return;
+
+            byte[] msg = new byte[ByteUtil.SIZEOF_SHORT + ByteUtil.SIZEOF_LONG];
+
+            int off = 0;
+            off = ByteUtil.writeShort(msg, off, eventTypeMotor);
+            off = ByteUtil.writeLong(msg, off, Double.doubleToLongBits(motor));
+
+            reqSocket.send(msg);
+
+            reqSocket.recv();
+        }
+    }
+
+    public static interface IDrogonClientLogger {
+        public void debug(String msg);
     }
 }

@@ -53,7 +53,15 @@ public class ControlPanelActivity extends Activity implements ControlPanelEventH
             txtHost.setText( sharedPref.getString( "host", "" ) );
         }
 
-        drogonClient = new DrogonClient(this);
+        PowerSlider powerSlider = (PowerSlider) this.findViewById( R.id.powerSlider1 );
+        powerSlider.setHandler(this);
+
+        drogonClient = new DrogonClient(new DrogonClient.IDrogonClientLogger() {
+            @Override
+            public void debug(String msg) {
+                writeDebugMessage(msg);
+            }
+        });
 
         debugMessage = "";
         tvDebug = (TextView) this.findViewById(R.id.tvDebug);
@@ -68,22 +76,24 @@ public class ControlPanelActivity extends Activity implements ControlPanelEventH
                 } else {
                     connect();
                 }
-
-                mConnected = !mConnected;
             }
         } );
 
         btnArm = (Button) this.findViewById( R.id.btnArm );
         btnArm.setOnClickListener( new View.OnClickListener( ) {
             public void onClick( View v ) {
+                if (!mConnected) return;
+
                 if (mArmed) {
                     btnArm.setBackgroundResource(R.drawable.red_button);
                     btnArm.setText("Arm");
                     writeDebugMessage("Disarming...");
+                    drogonClient.updateArmed(false);
                 } else {
                     btnArm.setBackgroundResource(R.drawable.green_button);
                     btnArm.setText("Disarm");
                     writeDebugMessage("Arming...");
+                    drogonClient.updateArmed(true);
                 }
 
                 mArmed = !mArmed;
@@ -111,7 +121,7 @@ public class ControlPanelActivity extends Activity implements ControlPanelEventH
                 editor.putString("host", host);
                 editor.commit();
 
-                writeDebugMessage("Connecting to " + host);
+                //writeDebugMessage("Connecting to " + host);
 
                 drogonClient.connect(host);
 
@@ -124,7 +134,7 @@ public class ControlPanelActivity extends Activity implements ControlPanelEventH
     private void disconnect() {
         if (mConnected) {
             drogonClient.disconnect();
-            writeDebugMessage("Disconnected");
+            //writeDebugMessage("Disconnected");
 
             btnConnect.setText("Connect");
             mConnected = false;
@@ -154,6 +164,13 @@ public class ControlPanelActivity extends Activity implements ControlPanelEventH
                 //finish( );
             }
         } );
+    }
+
+    @Override
+    public void onMotor(double motor) {
+        if (!mConnected) return;
+
+        drogonClient.updateMotor(motor, motor > 0.0);
     }
 
     @Override

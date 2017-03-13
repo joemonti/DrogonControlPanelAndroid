@@ -70,6 +70,8 @@ public class PowerSlider extends SurfaceView implements SurfaceHolder.Callback {
     private ShapeDrawable gutterMarkShape;
     private ShapeDrawable[] gutterTickShapes = new ShapeDrawable[21];
 
+    private ControlPanelEventHandler handler;
+
     public PowerSlider( Context context ) {
         super( context );
 
@@ -151,6 +153,10 @@ public class PowerSlider extends SurfaceView implements SurfaceHolder.Callback {
         setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
     }
 
+    public void setHandler(ControlPanelEventHandler handler) {
+        this.handler = handler;
+    }
+
     @Override
     public void surfaceChanged( SurfaceHolder holder, int format, int width,
                                 int height ) {
@@ -215,6 +221,10 @@ public class PowerSlider extends SurfaceView implements SurfaceHolder.Callback {
         gutterMarkShape.setBounds(0, ballTop + (ballH/2) - gutterMarkH, gutterW, ballTop + (ballH/2) );
 
         valueY = ballTop + (int) (ballH*0.4);
+
+        if (handler != null) {
+            handler.onMotor(this.value);
+        }
     }
 
     @Override
